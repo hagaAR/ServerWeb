@@ -1,0 +1,44 @@
+
+<html>
+<head>
+<meta charset="utf-8" />
+<title>PeerJS</title> 
+</head>
+
+<body>
+<h1>Communication avec PeerJS !</h1>
+<p><input type="button" value="NewPeer" id="poke" /></p>
+
+<script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+<script src="http://cdn.peerjs.com/0.3/peer.js"></script>
+
+<script>
+//fonctions
+	function connecter(){
+		var peer = new Peer({host: 'localhost', port: 9000, path: '/.'});
+	    //var peer = new Peer('Dzeijf');
+	    //var peer = new Peer('someid', {host: 'localhost', port: 9000,key: '3000'});
+	   peer.on('open', function(id) {
+	 		console.log('vous venez de vous connecter et votre id est: ' + id);
+	   		
+		 })
+		//document.write(peer.id);
+		//var ide ;
+		//console.log('vous venez de vous connecter et votre id est: ' + ide);
+		peer.on('NouveauPair', function(id){
+			console.log('un nouveau pair se connecte ID: '+id);
+		})
+	}
+	function genererStatut(){
+		
+	}
+
+</script>
+<script>
+//interface graphique
+$('#poke').click(function(){
+    	connecter();
+})
+</script>
+</body> 
+</html>
