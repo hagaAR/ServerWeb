@@ -5,6 +5,7 @@
 <title>zefzef</title> 
 <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
 <script src="http://cdn.peerjs.com/0.3/peer.js"></script>
+<script src="/socket.io/socket.io.js"></script>
 </head>
 
 <body>
@@ -31,6 +32,13 @@ var mon_id;
 var mon_nom;
 var statut_Alice;
 var Statut;
+var socket = io.connect('http://localhost:8080');
+socket.on('message', function(message) {
+	alert('Le serveur a un message pour vous : ' + message); 
+})
+
+
+
 function connecter(){
 	console.log('methode connecter()');
 	mon_nom= document.forms["connecting_form"]["nom"].value;
@@ -48,14 +56,13 @@ function connecter(){
 		statut_Alice={i_d: mon_id,nom: mon_nom,diffuseur: false,spectateur: false,localisation: null};
 		Statut={statut_alice: statut_Alice};
 		console.log('voici id du statut: ' +Statut.statut_alice.i_d);
-		Statut = eval(Statut);
 		//console.log(Statut);
 		sendStatut();
 	 })
 	
 }
 function sendStatut(){
-
+	socket.emit('statut_alice',Statut);
 	console.log('envoie Statut');
 }
 
