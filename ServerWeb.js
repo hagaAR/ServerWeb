@@ -14,7 +14,11 @@ var io = require('socket.io').listen(serverWeb);
 io.sockets.on('connection', function (socket) {
 	console.log('Un client est connecté !'); 
 	socket.on('statut_alice',function (statut) {
-		console.log('Un client envoie son statut ! Son ID est : ' + statut.statut_alice.i_d); 
+		//des quon recoit une notif 'statut'
+		console.log('Le client'+statut.statut_alice.nom +'envoie/MAJ son statut ! Son ID est : ' + statut.statut_alice.i_d); 
+		//MAJ de la bdd des clients
+		
+		//emission de cette bdd a tout le monde
 	});
 });
 
