@@ -2,43 +2,71 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<title>PeerJS</title> 
+<title>zefzef</title> 
+<script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+<script src="http://cdn.peerjs.com/0.3/peer.js"></script>
 </head>
 
 <body>
-<h1>Communication avec PeerJS !</h1>
-<p><input type="button" value="NewPeer" id="poke" /></p>
-
-<script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
-<script src="http://cdn.peerjs.com/0.3/peer.js"></script>
+<div id="header" style="visibility:hidden;">Bonjour</div>
+<div id="connect_div" style="visibility : visible;">
+	<form name="connecting_form" method="post" action="Client.html" onchange="return connecter()">
+		<input type="text" placeholder="Entrez votre nom" name="nom" id="name_id" required/><br/>
+		<input type="submit" value="Connexion" id="demande_connexion" />
+	</form>
+	<script>
+	
+	</script>
+</div>
+<div id="disconnect"></div>
+<div id="diff_list" style="visibility:hidden;">
+	liste des diffuseurs
+</div>
+<div id="video" style="visibility:hidden;"></div>
+<div id="pji" style="visibility:hidden;"></div>
 
 <script>
 //fonctions
-	function connecter(){
-		var peer = new Peer({host: 'localhost', port: 9000, path: '/.'});
-	    //var peer = new Peer('Dzeijf');
-	    //var peer = new Peer('someid', {host: 'localhost', port: 9000,key: '3000'});
-	   peer.on('open', function(id) {
-	 		console.log('vous venez de vous connecter et votre id est: ' + id);
-	   		
-		 })
-		//document.write(peer.id);
-		//var ide ;
-		//console.log('vous venez de vous connecter et votre id est: ' + ide);
-		peer.on('NouveauPair', function(id){
-			console.log('un nouveau pair se connecte ID: '+id);
-		})
-	}
-	function genererStatut(){
-		
-	}
+var mon_id;
+var mon_nom;
+var statut_Alice;
+var Statut;
+function connecter(){
+	console.log('methode connecter()');
+	mon_nom= document.forms["connecting_form"]["nom"].value;
+	console.log('votre nom est: ' +mon_nom);
+	var peer = new Peer({host: 'localhost', port: 9000, path: '/.'});
+    peer.on('open', function(id) {
+ 		console.log('vous venez de vous connecter et votre id est: ' + id);
+   		document.getElementById("connect_div").style.visibility ="hidden";
+   		document.getElementById("diff_list").style.visibility ="visible";
+   		document.getElementById("header").style.visibility ="visible";
+		document.getElementById("pji").style.visibility ="visible";
+		mon_id= this.id;
+		//generer Statut
+		console.log('on genere Statut');
+		statut_Alice={i_d: mon_id,nom: mon_nom,diffuseur: false,spectateur: false,localisation: null};
+		Statut={statut_alice: statut_Alice};
+		console.log('voici id du statut: ' +Statut.statut_alice.i_d);
+		Statut = eval(Statut);
+		//console.log(Statut);
+		sendStatut();
+	 })
+	
+}
+function sendStatut(){
+	var xhr = new XMLHttpRequest();
+	xhr.open('GET',Statut,'http://localhost:8080');
+	xhr.send();
+	console.log('envoie Statut');
+}
 
 </script>
 <script>
 //interface graphique
-$('#poke').click(function(){
-    	connecter();
-})
+//Dynamic change DOM
+//findbyID
 </script>
+
 </body> 
 </html>
