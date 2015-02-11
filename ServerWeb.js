@@ -33,6 +33,7 @@ io.sockets.on('connection', function (socket) {
 	});
 	socket.on('disconnect',function(){
 		var k=0;
+		//dissociation de PeerServer et WebServer??
 		var indicemax= listDiff.length-1;
 		if (listDiff.length<0){indicemax=0;}
 		while (k<indicemax){
