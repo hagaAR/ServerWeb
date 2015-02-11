@@ -16,12 +16,11 @@
 		<input type="submit" value="Connexion" id="demande_connexion" />
 	</form>
 	<script>
-	
+	$('#name_id').focus();
 	</script>
 </div>
 <div id="disconnect"></div>
 <div id="diff_list" style="visibility:hidden;">
-	liste des diffuseurs
 </div>
 <div id="video" style="visibility:hidden;"></div>
 <div id="pji" style="visibility:hidden;"></div>
@@ -35,6 +34,12 @@ var Statut;
 var socket = io.connect('http://localhost:8080');
 socket.on('message', function(message) {
 	alert('Le serveur a un message pour vous : ' + message); 
+})
+socket.on('envoieDB', function(liste){
+	indice_dernier_elt = liste.length -1;
+	if (indice_dernier_elt<0){indice_dernier_elt=0;}
+	afficherListe(liste);
+	//alert('le client ' + liste[indice_dernier_elt].nom + ' vient de se connecter!');
 })
 
 
@@ -55,17 +60,26 @@ function connecter(){
 		console.log('on genere Statut');
 		statut_Alice={i_d: mon_id,nom: mon_nom,diffuseur: false,spectateur: false,localisation: null};
 		Statut={statut_alice: statut_Alice};
-		console.log('voici id du statut: ' +Statut.statut_alice.i_d);
+		console.log('voici id du statut: ' +statut_Alice.i_d);
 		//console.log(Statut);
 		sendStatut();
 	 })
 	
 }
 function sendStatut(){
-	socket.emit('statut_alice',Statut);
-	console.log('envoie Statut');
+	//socket.emit('ajout_statut',Statut);
+	socket.emit('ajout_statut',statut_Alice);
+	console.log('envoie nouveau Statut');
 }
 
+function gestionListe(liste){
+	document.getElementById("diff_list").innerHTML='<caption>liste des diffuseurs</caption>';
+	document.getElementById("diff_list").innerHTML+='<table>';
+	for (var k=0;k<liste.length;k++){
+		document.getElementById("diff_list").innerHTML+='<tr><td>'+'<input type="button" name ="boutonAutreClient" value="'+ liste[k].nom+'" id="'+liste[k].i_d+'" />'+'</td></tr>';
+	}
+	document.getElementById("diff_list").innerHTML+='</table>';
+}
 </script>
 <script>
 //interface graphique
