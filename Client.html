@@ -38,7 +38,7 @@ socket.on('message', function(message) {
 socket.on('envoieDB', function(liste){
 	indice_dernier_elt = liste.length -1;
 	if (indice_dernier_elt<0){indice_dernier_elt=0;}
-	afficherListe(liste);
+	gestionListe(liste);
 	//alert('le client ' + liste[indice_dernier_elt].nom + ' vient de se connecter!');
 })
 
@@ -48,7 +48,8 @@ function connecter(){
 	console.log('methode connecter()');
 	mon_nom= document.forms["connecting_form"]["nom"].value;
 	console.log('votre nom est: ' +mon_nom);
-	var peer = new Peer({host: 'localhost', port: 9000, path: '/.'});
+	//var peer = new Peer({host: 'localhost', port: 9000, path: '/.'});//PeerServer en local
+	var peer = new Peer({key: 'i006gh58pu95dn29'});
     peer.on('open', function(id) {
  		console.log('vous venez de vous connecter et votre id est: ' + id);
    		document.getElementById("connect_div").style.visibility ="hidden";
