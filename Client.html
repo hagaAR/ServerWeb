@@ -2,14 +2,14 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<title>zefzef</title> 
+<title>Captures</title> 
 <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
 <script src="http://cdn.peerjs.com/0.3/peer.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 </head>
 
 <body>
-<div id="header" style="visibility:hidden;">Bonjour</div>
+<div id="header" style="visibility:hidden;"></div>
 <div id="connect_div" style="visibility : visible;">
 	<form name="connecting_form" method="post" action="Client.html" onchange="return connecter()">
 		<input type="text" placeholder="Entrez votre nom" name="nom" id="name_id" required/><br/>
@@ -19,19 +19,45 @@
 	$('#name_id').focus();
 	</script>
 </div>
-<div id="disconnect"></div>
+<div id="disconnect" style="visibility:hidden;">
+	<input type="button" value="Deconnexion" id="disconnect_button" onclick="deco()"/>
+</div>
 <div id="diff_list" style="visibility:hidden;">
 </div>
-<div id="video" style="visibility:hidden;"></div>
-<div id="pji" style="visibility:hidden;"></div>
+<div id="self_video" style="visibility:hidden;">
+	<input type="button" value="Filmer" id="bouton_filmer" onclick="filmer()"/>
+	<input type="button" value="Stop" id="bouton_arret_film" onclick="stop_filmer()"/>
+	<video id="self_video_player">
+
+	</video>
+	<script>
+
+	</script>
+</div>
+<div id="localisation_div" style="visibility:hidden;">
+	<input type="button" value="Geolocalisation" id="location_button" onclick="getLocation()"/>
+	<input type="button" value="Qui est dans le coin?" id="others_location_button" onclick="askOthersPositions()"/>
+</div>
 
 <script>
 //fonctions
 var mon_id;
 var mon_nom;
 var statut_Alice;
+statut_Alice={i_d: "",nom: "",diffuseur: false,spectateur: false,localisation: null, self_video_URL:null};
 var Statut;
+var liste_diffuseurs;
+var self_video = document.getElementById("self_video_player");
+
+
+
+navigator.getUserMedia = ( navigator.getUserMedia ||
+                       navigator.webkitGetUserMedia ||
+                       navigator.mozGetUserMedia ||
+                       navigator.msGetUserMedia);
+
 var socket = io.connect('http://localhost:8080');
+
 socket.on('message', function(message) {
 	alert('Le serveur a un message pour vous : ' + message); 
 })
@@ -40,47 +66,155 @@ socket.on('envoieDB', function(liste){
 	if (indice_dernier_elt<0){indice_dernier_elt=0;}
 	gestionListe(liste);
 	//alert('le client ' + liste[indice_dernier_elt].nom + ' vient de se connecter!');
+	console.log('on recoit une liste');
 })
 
 
 
 function connecter(){
+	//PeerServer en cloud
+	var	peer = new Peer({key: 'i006gh58pu95dn29'});
 	console.log('methode connecter()');
 	mon_nom= document.forms["connecting_form"]["nom"].value;
 	console.log('votre nom est: ' +mon_nom);
-	//var peer = new Peer({host: 'localhost', port: 9000, path: '/.'});//PeerServer en local
-	var peer = new Peer({key: 'i006gh58pu95dn29'});
+	document.getElementById("header").innerHTML='Bonjour ' + mon_nom;
+	//peer = new Peer({host: 'localhost', port: 9000, path: '/.'});
     peer.on('open', function(id) {
  		console.log('vous venez de vous connecter et votre id est: ' + id);
    		document.getElementById("connect_div").style.visibility ="hidden";
    		document.getElementById("diff_list").style.visibility ="visible";
    		document.getElementById("header").style.visibility ="visible";
-		document.getElementById("pji").style.visibility ="visible";
+		document.getElementById("self_video").style.visibility ="visible";
+		document.getElementById("localisation_div").style.visibility ="visible";
+		document.getElementById("disconnect").style.visibility ="visible";
 		mon_id= this.id;
 		//generer Statut
 		console.log('on genere Statut');
-		statut_Alice={i_d: mon_id,nom: mon_nom,diffuseur: false,spectateur: false,localisation: null};
+		statut_Alice={i_d: mon_id,nom: mon_nom,diffuseur: false,spectateur: false,localisation: null,self_video_URL:null};
 		Statut={statut_alice: statut_Alice};
 		console.log('voici id du statut: ' +statut_Alice.i_d);
 		//console.log(Statut);
-		sendStatut();
+		ajoutStatut();
 	 })
 	
 }
-function sendStatut(){
+function ajoutStatut(){
 	//socket.emit('ajout_statut',Statut);
 	socket.emit('ajout_statut',statut_Alice);
 	console.log('envoie nouveau Statut');
 }
+function MAJStatut(){
+	socket.emit('maj_statut',statut_Alice);
+	console.log('envoie MAJ Statut');
+}
+
 
 function gestionListe(liste){
+	document.getElementById("diff_list").innerHTML='';
 	document.getElementById("diff_list").innerHTML='<caption>liste des diffuseurs</caption>';
 	document.getElementById("diff_list").innerHTML+='<table>';
 	for (var k=0;k<liste.length;k++){
-		document.getElementById("diff_list").innerHTML+='<tr><td>'+'<input type="button" name ="boutonAutreClient" value="'+ liste[k].nom+'" id="'+liste[k].i_d+'" />'+'</td></tr>';
+		document.getElementById("diff_list").innerHTML+='<tr><td>'+'<input type="button" name ="boutonAutreClient" value="'+ liste[k].nom+'" id="'+liste[k].i_d+'" onclick="visionnage_video('+liste[k].i_d+')"/>'+'</td></tr>';
 	}
 	document.getElementById("diff_list").innerHTML+='</table>';
 }
+
+function filmer(){
+	// navigator.getUserMedia = ( navigator.getUserMedia ||
+ //                       navigator.webkitGetUserMedia ||
+ //                       navigator.mozGetUserMedia ||
+ //                       navigator.msGetUserMedia);
+
+	if (navigator.getUserMedia) {
+	   navigator.getUserMedia (
+
+	      // constraints
+	      {
+	         video: true,
+	         audio: true
+	      },
+
+	      // successCallback
+	      function(localMediaStream) {
+	         var self_video = document.getElementById("self_video_player");
+	         self_video.src = window.URL.createObjectURL(localMediaStream);
+	         statut_Alice.self_video_URL=self_video.src;
+	         console.log('self_video.src : '+self_video.src);
+	         // Do something with the video here, e.g. video.play()
+	         self_video.play();
+	         document.getElementById("bouton_filmer").disabled =true;
+	         document.getElementById("bouton_arret_film").disabled =false;
+	         statut_Alice.diffuseur=true;
+	         Statut={statut_alice: statut_Alice};
+	         MAJStatut();
+	      },
+
+	      // errorCallback
+	      function(err) {
+	         console.log("The following error occured: " + err);
+	      }
+	   );
+	} else {console.log("getUserMedia not supported");}
+}
+function stop_filmer(){
+	//var self_video = document.getElementById("self_video_player");
+	//self_video.src = null;
+	//navigator.getUserMedia=null;
+	//impossible de desactiver getusermedia -ie la webcam- par l'api (donc sans appuyer MANUELLEMENT)
+	//risque de probleme d'utilisation en fond sur un smartphone sans que le user puisse le voir
+	document.getElementById("bouton_filmer").disabled =false;
+	document.getElementById("bouton_arret_film").disabled =true;
+	statut_Alice.diffuseur=false;
+	statut_Alice.self_video_URL=null;
+	Statut={statut_alice: statut_Alice};
+	MAJStatut();
+}
+
+function connexion_peer(id){
+	var con_peer=peer.connect(id);
+}
+function receive_connexion(){
+	con_peer.on('open', function() {
+  // Receive messages
+  conn.on('data', function(data) {
+    console.log('Received', data);
+  });
+
+  // Send messages
+  conn.send('Hello!');
+});
+}
+
+var localisation_div = document.getElementById("localisation_div");
+function getLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(showPosition);
+
+    } else { 
+        localisation_div.innerHTML = "Geolocation is not supported by this browser.";}
+    }
+    
+function showPosition(position) {
+    localisation_div.innerHTML="Latitude: " + position.coords.latitude + 
+    "<br>Longitude: " + position.coords.longitude;	
+    statut_Alice.localisation={latitude: position.coords.latitude, longitude: position.coords.longitude};
+        MAJStatut();
+        console.log(statut_Alice.localisation);
+}
+function askOthersPositionButton(){
+	//appuie sur le bouton pour rechercher ds googleMap
+}
+function askOthersPosition(){
+	//demande au serveur tous les gens dans le coin
+	socket.emit('demandelocalisations',Coordonnees);
+}
+
+function deco(){
+	console.log('Deco');
+	//peer.disconnect();
+	socket.disconnect();
+}
+
 </script>
 <script>
 //interface graphique
