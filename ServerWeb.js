@@ -3,6 +3,7 @@ var fs = require('fs');
 
 var serverWeb = http.createServer(function(req,res){
 	fs.readFile('./Client.html', 'utf-8', function(error, content) {
+	//fs.readFile('./Client_2.html', 'utf-8', function(error, content) {
 		res.writeHead(200, {"Content-Type": "text/html"});
 		res.end(content); 
 	});
@@ -34,6 +35,7 @@ io.sockets.on('connection', function (socket) {
 	});
 	//gestion de la deconnexion
 	socket.on('disconnect',function(){
+		//enlever de chacun des listes
 		var k=0;
 		//dissociation de PeerServer et WebServer??
 		var indicemax= listDiff.length;
@@ -57,6 +59,7 @@ io.sockets.on('connection', function (socket) {
 	});
 
 	//gestion de MAJ des statuts
+	//MAJ ds la base de donnees
 	socket.on('maj_statut',function(statut){
 		var k=0;
 		//dissociation de PeerServer et WebServer??
@@ -76,6 +79,27 @@ io.sockets.on('connection', function (socket) {
 		};
 		socket.broadcast.emit('envoieDB',listDiff);
 	});
+	socket.on('ask_info_callee',function(id_dest){
+		console.log('recherche infos callee');
+		console.log(id_dest);
+		var k=0;
+		var statut_dest;
+		//dissociation de PeerServer et WebServer??
+		var indicemax= listDiff.length;
+		//console.log('client '+ socket.id +' se deconnecte');
+		if (listDiff.length<0){indicemax=0;}
+		//console.log('indice max: '+indicemax);
+		while (k<indicemax){
+			if (listAssoPeerWebID[k].WebID==id_dest){
+				console.log('on renvoie les infos du destinataire '+ id_dest);
+				statut_dest=listDiff[k];
+				socket.emit('receive_info_callee',statut_dest); //renvoyer la DB aux clients
+				break;
+			}
+			k++
+		};
+
+	});
 
 	//gestion des demandes des localisations
 	socket.on('demandelocalisations',function(coordonnees){
@@ -84,7 +108,5 @@ io.sockets.on('connection', function (socket) {
 		socket.broadcast.emit('envoieDB',sous_listDiff);
 	});
 });
-
-
 
 serverWeb.listen(8080);

@@ -1,0 +1,241 @@
+
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Captures</title> 
+<script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+<script src="http://cdn.peerjs.com/0.3/peer.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="http://maps.googleapis.com/maps/api/js"></script>
+</head>
+
+<body>
+<div id="header" style="visibility:hidden;"></div>
+<div id="connect_div" style="visibility : visible;">
+	<!-- <form name="connecting_form" method="post" action="Client.html" onchange="return connecter()">
+		<input type="text" placeholder="Entrez votre nom" name="nom" id="name_id" required/><br/>
+		<input type="submit" value="Connexion" id="demande_connexion" />
+	</form> -->
+	<input type="text" placeholder="Entrez votre nom" name="nom" id="name_id" required/><br/>
+	<input type="button" value="Connexion" id="demande_connexion" onclick="connecter()"/>
+	<script>
+	$('#name_id').focus();
+	</script>
+</div>
+<div id="disconnect" style="visibility:hidden;">
+	<input type="button" value="Deconnexion" id="disconnect_button" onclick="deco()"/>
+</div>
+<div id="diff_list" style="visibility:hidden;">
+</div>
+<div id="self_video" style="visibility:hidden;">
+	<input type="button" value="Filmer" id="bouton_filmer" onclick="filmer()"/>
+	<input type="button" value="Stop" id="bouton_arret_film" onclick="stop_filmer()"/>
+	<video id="self_video_player">
+
+	</video>
+	<script>
+
+	</script>
+</div>
+<div id="regarder_div" style="visibility:hidden;">
+	<input type="button" value="Regarder" id="bouton_regarder" onclick="filmer()"/>
+	<input type="button" value="Stop" id="bouton_arret" onclick="stop_filmer()"/>
+	<video id="remote_video_player">
+
+	</video>
+	<script>
+
+	</script>
+</div>
+<div id="localisation_div" style="visibility:hidden;">
+	<input type="button" value="Geolocalisation" id="location_button" onclick="getLocation()"/>
+	<input type="button" value="Qui est dans le coin?" id="others_location_button" onclick="askOthersPositions()" style="visibility:hidden;"/>
+	<div id="infos_div"></div>
+	<div id="googleMap" style="width:500px;height:380px;"></div>
+</div>
+
+<script>
+//fonctions
+var mon_id;
+var mon_nom;
+var statut_Alice;
+statut_Alice={i_d: "",nom: "",diffuseur: false,spectateur: false,localisation: null, self_video_URL:null};
+var Statut;
+var liste_diffuseurs=[];
+var self_video = document.getElementById("self_video_player");
+var remote_video = document.getElementById("remote_video_player");
+var id_dest;
+var liste_boutons=[];
+
+navigator.getUserMedia = ( navigator.getUserMedia ||
+                       navigator.webkitGetUserMedia ||
+                       navigator.mozGetUserMedia ||
+                       navigator.msGetUserMedia);
+
+var socket = io.connect('http://localhost:8080');
+//var	peer = new Peer({key: 'i006gh58pu95dn29'});
+//console.log(peer);
+socket.on('message', function(message) {
+	alert('Le serveur a un message pour vous : ' + message); 
+})
+socket.on('envoieDB', function(liste){
+	indice_dernier_elt = liste.length -1;
+	if (indice_dernier_elt<0){indice_dernier_elt=0;}
+	gestionListe(liste);
+	//alert('le client ' + liste[indice_dernier_elt].nom + ' vient de se connecter!');
+	console.log('on recoit une liste');
+})
+// socket.on('receive_info_callee', function(statut_dest){
+// 	console.log('on recoite des infos de notre destinataire');
+// 	console.log('statut_dest');
+// })
+
+
+function connecter(){
+	console.log('fct connecter()');
+	//PeerServer en cloud
+	var peer = new Peer({key: 'i006gh58pu95dn29'});
+	console.log('peer : '+ peer);
+	//mon_nom= document.forms["connecting_form"]["nom"].value;
+	mon_nom= document.getElementById('name_id').value
+	console.log('votre nom est: ' +mon_nom);
+	document.getElementById("header").innerHTML='Bonjour ' + mon_nom;
+	//peer = new Peer({host: 'localhost', port: 9000, path: '/.'});
+    peer.on('open', function(id) {
+ 		console.log('vous venez de vous connecter et votre id est: ' + id);
+   		document.getElementById("connect_div").style.visibility ="hidden";
+   		document.getElementById("diff_list").style.visibility ="visible";
+   		document.getElementById("header").style.visibility ="visible";
+		document.getElementById("self_video").style.visibility ="visible";
+		document.getElementById("localisation_div").style.visibility ="visible";
+		document.getElementById("disconnect").style.visibility ="visible";
+		mon_id= this.id;
+		//generer Statut
+		console.log('on genere Statut');
+		statut_Alice={i_d: mon_id,nom: mon_nom,diffuseur: false,spectateur: false,localisation: null,self_video_URL:null};
+		Statut={statut_alice: statut_Alice};
+		console.log('voici id du statut: ' +statut_Alice.i_d);
+		//console.log(Statut);
+		ajoutStatut();
+	})
+}
+	
+function receive_connexionP2P(){
+
+}
+function ajoutStatut(){
+	//socket.emit('ajout_statut',Statut);
+	socket.emit('ajout_statut',statut_Alice);
+	console.log('envoie nouveau Statut');
+}
+function MAJStatut(){
+	socket.emit('maj_statut',statut_Alice);
+	console.log('envoie MAJ Statut');
+}
+
+function ask_info_callee(id_dest){
+	//id_dest=id;
+	console.log('ask_info_callee id: '+id_dest);
+	socket.emit('ask_info_callee',id_dest);
+	socket.on('receive_info_callee', function(statut_dest){
+		console.log('on recoite des infos de notre destinataire');
+		console.log('statut_dest');
+	});
+}
+
+function gestionListe(liste){
+	liste_boutons=[];
+	document.getElementById("diff_list").innerHTML='';
+	document.getElementById("diff_list").innerHTML='<caption>liste des diffuseurs</caption>';
+	document.getElementById("diff_list").innerHTML+='<table>';
+	for (var k=0;k<liste.length;k++){
+		liste_diffuseurs=[];
+		liste_diffuseurs[k]=liste[k];
+		var id_destination= String(liste[k].i_d);
+		console.log(id_destination);
+		var button = document.createElement("input" ) ;
+        button.type = "button" ;
+        button.value = liste[k].nom ;
+        button.name = liste[k].nom ;
+        button.setAttribute("onClick","return ask_info_callee("+id_destination+")") ;
+        document.getElementById("diff_list").appendChild(button);
+		// document.getElementById("diff_list").innerHTML+='<tr><td>'+'<input type="button" name ="boutonAutreClient" value="'+ liste[k].nom+'" id="'+liste[k].i_d+'" />'+'</td></tr>';
+		// console.log('voici les id des destinataires: '+liste[k].i_d);
+		// console.log('qd on appuie, on lance ask_info_callee');
+		// liste_boutons[k]=document.getElementById(liste[k].i_d);
+		// liste_boutons[k].onclick= ask_info_callee(liste[k].i_d);
+	}
+	//liste_boutons.addEventListener("click", ask_info_callee(liste[k].i_d));
+	document.getElementById("diff_list").innerHTML+='</table>';
+};
+
+function filmer(){
+	// navigator.getUserMedia = ( navigator.getUserMedia ||
+ //                       navigator.webkitGetUserMedia ||
+ //                       navigator.mozGetUserMedia ||
+ //                       navigator.msGetUserMedia);
+
+	if (navigator.getUserMedia) {
+	   navigator.getUserMedia (
+
+	      // constraints
+	      {
+	         video: true,
+	         audio: true
+	      },
+
+	      // successCallback
+	      function(localMediaStream) {
+	         var self_video = document.getElementById("self_video_player");
+	         self_video.src = window.URL.createObjectURL(localMediaStream);
+	         statut_Alice.self_video_URL=self_video.src;
+	         console.log('self_video.src : '+self_video.src);
+	         // Do something with the video here, e.g. video.play()
+	         self_video.play();
+	         document.getElementById("bouton_filmer").disabled =true;
+	         document.getElementById("bouton_arret_film").disabled =false;
+	         statut_Alice.diffuseur=true;
+	         Statut={statut_alice: statut_Alice};
+	         MAJStatut();
+	      },
+
+	      // errorCallback
+	      function(err) {
+	         console.log("The following error occured: " + err);
+	      }
+	   );
+	} else {console.log("getUserMedia not supported");}
+}
+function stop_filmer(){
+	//var self_video = document.getElementById("self_video_player");
+	//self_video.src = null;
+	//navigator.getUserMedia=null;
+	//impossible de desactiver getusermedia -ie la webcam- par l'api (donc sans appuyer MANUELLEMENT)
+	//risque de probleme d'utilisation en fond sur un smartphone sans que le user puisse le voir
+	document.getElementById("bouton_filmer").disabled =false;
+	document.getElementById("bouton_arret_film").disabled =true;
+	statut_Alice.diffuseur=false;
+	statut_Alice.self_video_URL=null;
+	Statut={statut_alice: statut_Alice};
+	MAJStatut();
+}
+
+/////deconnexion
+function deco(){
+	console.log('Deco');
+	alert('vous vous etes deconnecte');
+	//peer.disconnect();
+	socket.disconnect();
+	return;
+}
+
+//window.onbeforeunload=deco();
+</script>
+<script>
+//interface graphique
+//Dynamic change DOM
+//findbyID
+</script>
+
+</body> 
+</html>

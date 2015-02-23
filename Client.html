@@ -1,55 +1,35 @@
-
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Captures</title> 
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Captured</title> 
 <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
 <script src="http://cdn.peerjs.com/0.3/peer.js"></script>
 <script src="/socket.io/socket.io.js"></script>
+<script src="http://maps.googleapis.com/maps/api/js"></script>
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+<!-- Optional theme -->
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js"></script>
 </head>
 
 <body>
-<div id="header" style="visibility:hidden;"></div>
-<div id="connect_div" style="visibility : visible;">
-	<form name="connecting_form" method="post" action="Client.html" onchange="return connecter()">
-		<input type="text" placeholder="Entrez votre nom" name="nom" id="name_id" required/><br/>
-		<input type="submit" value="Connexion" id="demande_connexion" />
-	</form>
-	<script>
-	$('#name_id').focus();
-	</script>
-</div>
-<div id="disconnect" style="visibility:hidden;">
-	<input type="button" value="Deconnexion" id="disconnect_button" onclick="deco()"/>
-</div>
-<div id="diff_list" style="visibility:hidden;">
-</div>
-<div id="self_video" style="visibility:hidden;">
-	<input type="button" value="Filmer" id="bouton_filmer" onclick="filmer()"/>
-	<input type="button" value="Stop" id="bouton_arret_film" onclick="stop_filmer()"/>
-	<video id="self_video_player">
-
-	</video>
-	<script>
-
-	</script>
-</div>
-<div id="localisation_div" style="visibility:hidden;">
-	<input type="button" value="Geolocalisation" id="location_button" onclick="getLocation()"/>
-	<input type="button" value="Qui est dans le coin?" id="others_location_button" onclick="askOthersPositions()"/>
-</div>
-
 <script>
 //fonctions
 var mon_id;
 var mon_nom;
 var statut_Alice;
+var calling;
 statut_Alice={i_d: "",nom: "",diffuseur: false,spectateur: false,localisation: null, self_video_URL:null};
 var Statut;
-var liste_diffuseurs;
+var liste_diffuseurs=[];
 var self_video = document.getElementById("self_video_player");
-
-
+//var localStream;
+var remote_video = document.getElementById("remote_video_player");
+var id_dest;
+var liste_boutons=[];
 
 navigator.getUserMedia = ( navigator.getUserMedia ||
                        navigator.webkitGetUserMedia ||
@@ -57,47 +37,72 @@ navigator.getUserMedia = ( navigator.getUserMedia ||
                        navigator.msGetUserMedia);
 
 var socket = io.connect('http://localhost:8080');
+//PeerServer en cloud
+var peer ;
+function connexionPeerServeur(){
+	//clef pour utiliser le PeerServeur en cloud...limite a 50 users, mais en opensource
+	//peer= new Peer({key: 'i006gh58pu95dn29'});
+	//serveur STUN google, pour passer les NAT
+	peer= new Peer({key: 'i006gh58pu95dn29',config: {'iceServers': [{ url: 'stun:stun.l.google.com:19302' } ]}});
+	peer.on('open',function(){
+		mon_nom= document.getElementById('name_id').value
+		console.log('votre nom est: ' +mon_nom);
+		document.getElementById("header").innerHTML='<label for="disconnect_button">Bonjour ' + mon_nom+'</label>';
+		document.getElementById("header").style.visibility ="visible";
+		document.getElementById("connect_div").style.visibility ="hidden";
+		document.getElementById("nav").style.visibility ="visible";
+		document.getElementById("disconnect").style.visibility ="visible";
+		mon_id= this.id;
+		statut_Alice={i_d: mon_id,nom: mon_nom,diffuseur: false,spectateur: false,localisation: null,self_video_URL:null};
+		Statut={statut_alice: statut_Alice};
+		ajoutStatut();
+		afficher_liste();
+	});
 
-socket.on('message', function(message) {
-	alert('Le serveur a un message pour vous : ' + message); 
-})
+	//recevoir des appels
+ 	peer.on('call', function(call){
+      // Answer the call automatically (instead of prompting user) for demo purposes
+      call.answer(window.localStream);
+      //step3(call);
+    });
+};
+
 socket.on('envoieDB', function(liste){
 	indice_dernier_elt = liste.length -1;
 	if (indice_dernier_elt<0){indice_dernier_elt=0;}
-	gestionListe(liste);
-	//alert('le client ' + liste[indice_dernier_elt].nom + ' vient de se connecter!');
-	console.log('on recoit une liste');
+	///
+	//gerer la liste
+	document.getElementById("diff_list").innerHTML='';
+	document.getElementById("diff_list").innerHTML='liste des diffuseurs<br/>';
+	document.getElementById("diff_list").innerHTML+='<div class="btn-group-vertical">';
+	//document.getElementById("diff_list").innerHTML+='<ul class="nav nav-pills nav-stacked">';
+	for (var k=0;k<liste.length;k++){
+		liste_diffuseurs=[];
+		liste_diffuseurs[k]=liste[k];
+		var id_destination= String(liste_diffuseurs[k].i_d);
+		console.log('ceci est l id destination: ' +id_destination);
+		
+		var button = document.createElement("button") ;
+		//button.innerHTML+='<li>';
+        button.type = "button" ;
+        button.innerHTML+=liste_diffuseurs[k].nom;
+        button.setAttribute ("class","btn btn-primary");
+        button.value = liste_diffuseurs[k].nom ;
+        button.name = liste_diffuseurs[k].nom ;
+        button.setAttribute("onClick","return CallPeer('"+id_destination+"')") ;
+        //button.innerHTML+='</li>';
+        document.getElementById("diff_list").appendChild(button);
+        
+        //document.getElementById("diff_list").innerHTML+='</div>';
+        
+	}
+	//document.getElementById("diff_list").innerHTML+='</ul>';
+	document.getElementById("diff_list").innerHTML+='</div>';
+	////
+	//console.log('on recoit une liste');
+
 })
 
-
-
-function connecter(){
-	//PeerServer en cloud
-	var	peer = new Peer({key: 'i006gh58pu95dn29'});
-	console.log('methode connecter()');
-	mon_nom= document.forms["connecting_form"]["nom"].value;
-	console.log('votre nom est: ' +mon_nom);
-	document.getElementById("header").innerHTML='Bonjour ' + mon_nom;
-	//peer = new Peer({host: 'localhost', port: 9000, path: '/.'});
-    peer.on('open', function(id) {
- 		console.log('vous venez de vous connecter et votre id est: ' + id);
-   		document.getElementById("connect_div").style.visibility ="hidden";
-   		document.getElementById("diff_list").style.visibility ="visible";
-   		document.getElementById("header").style.visibility ="visible";
-		document.getElementById("self_video").style.visibility ="visible";
-		document.getElementById("localisation_div").style.visibility ="visible";
-		document.getElementById("disconnect").style.visibility ="visible";
-		mon_id= this.id;
-		//generer Statut
-		console.log('on genere Statut');
-		statut_Alice={i_d: mon_id,nom: mon_nom,diffuseur: false,spectateur: false,localisation: null,self_video_URL:null};
-		Statut={statut_alice: statut_Alice};
-		console.log('voici id du statut: ' +statut_Alice.i_d);
-		//console.log(Statut);
-		ajoutStatut();
-	 })
-	
-}
 function ajoutStatut(){
 	//socket.emit('ajout_statut',Statut);
 	socket.emit('ajout_statut',statut_Alice);
@@ -108,35 +113,33 @@ function MAJStatut(){
 	console.log('envoie MAJ Statut');
 }
 
+function CallPeer(id_dest){
+	//console.log('CallPeer id: '+id_dest);
+	//self_video = document.getElementById("self_video_player");
+	//console.log(self_video);
+	//Pb avec localStream
+	var calling= peer.call(id_dest,window.localStream);
+	calling.on('stream', function(stream){
+		//remote_video.src=URL.createObjectURL(stream);
+        $('#remote_video_player').prop('src', URL.createObjectURL(stream));
+    });
 
-function gestionListe(liste){
-	document.getElementById("diff_list").innerHTML='';
-	document.getElementById("diff_list").innerHTML='<caption>liste des diffuseurs</caption>';
-	document.getElementById("diff_list").innerHTML+='<table>';
-	for (var k=0;k<liste.length;k++){
-		document.getElementById("diff_list").innerHTML+='<tr><td>'+'<input type="button" name ="boutonAutreClient" value="'+ liste[k].nom+'" id="'+liste[k].i_d+'" onclick="visionnage_video('+liste[k].i_d+')"/>'+'</td></tr>';
-	}
-	document.getElementById("diff_list").innerHTML+='</table>';
+    //revenir a la page live
+    afficher_videos();
 }
 
 function filmer(){
-	// navigator.getUserMedia = ( navigator.getUserMedia ||
- //                       navigator.webkitGetUserMedia ||
- //                       navigator.mozGetUserMedia ||
- //                       navigator.msGetUserMedia);
-
 	if (navigator.getUserMedia) {
 	   navigator.getUserMedia (
-
 	      // constraints
 	      {
 	         video: true,
 	         audio: true
 	      },
-
 	      // successCallback
 	      function(localMediaStream) {
-	         var self_video = document.getElementById("self_video_player");
+	      	 window.localStream=localMediaStream;
+	      	 self_video = document.getElementById("self_video_player");
 	         self_video.src = window.URL.createObjectURL(localMediaStream);
 	         statut_Alice.self_video_URL=self_video.src;
 	         console.log('self_video.src : '+self_video.src);
@@ -148,7 +151,6 @@ function filmer(){
 	         Statut={statut_alice: statut_Alice};
 	         MAJStatut();
 	      },
-
 	      // errorCallback
 	      function(err) {
 	         console.log("The following error occured: " + err);
@@ -157,11 +159,8 @@ function filmer(){
 	} else {console.log("getUserMedia not supported");}
 }
 function stop_filmer(){
-	//var self_video = document.getElementById("self_video_player");
-	//self_video.src = null;
-	//navigator.getUserMedia=null;
 	//impossible de desactiver getusermedia -ie la webcam- par l'api (donc sans appuyer MANUELLEMENT)
-	//risque de probleme d'utilisation en fond sur un smartphone sans que le user puisse le voir
+	//risque(?) de probleme d'utilisation en fond sur un smartphone sans que le user puisse le voir
 	document.getElementById("bouton_filmer").disabled =false;
 	document.getElementById("bouton_arret_film").disabled =true;
 	statut_Alice.diffuseur=false;
@@ -170,57 +169,99 @@ function stop_filmer(){
 	MAJStatut();
 }
 
-function connexion_peer(id){
-	var con_peer=peer.connect(id);
-}
-function receive_connexion(){
-	con_peer.on('open', function() {
-  // Receive messages
-  conn.on('data', function(data) {
-    console.log('Received', data);
-  });
-
-  // Send messages
-  conn.send('Hello!');
-});
-}
-
-var localisation_div = document.getElementById("localisation_div");
-function getLocation() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(showPosition);
-
-    } else { 
-        localisation_div.innerHTML = "Geolocation is not supported by this browser.";}
-    }
-    
-function showPosition(position) {
-    localisation_div.innerHTML="Latitude: " + position.coords.latitude + 
-    "<br>Longitude: " + position.coords.longitude;	
-    statut_Alice.localisation={latitude: position.coords.latitude, longitude: position.coords.longitude};
-        MAJStatut();
-        console.log(statut_Alice.localisation);
-}
-function askOthersPositionButton(){
-	//appuie sur le bouton pour rechercher ds googleMap
-}
-function askOthersPosition(){
-	//demande au serveur tous les gens dans le coin
-	socket.emit('demandelocalisations',Coordonnees);
-}
-
+/////deconnexion
 function deco(){
 	console.log('Deco');
+	alert('vous vous etes deconnecte');
 	//peer.disconnect();
 	socket.disconnect();
+	document.getElementById("header").style.visibility ="hidden";
+	document.getElementById("connect_div").style.visibility ="hidden";
+	document.getElementById("nav").style.visibility ="hidden";
+	document.getElementById("diff_list").style.visibility ="hidden";
+	document.getElementById("self_video").style.visibility ="hidden";
+	document.getElementById("regarder_div").style.visibility ="hidden";
+	document.getElementById("localisation_div").style.visibility ="hidden";
+	document.getElementById("disconnect").style.visibility ="hidden";
+	return;
 }
 
+function afficher_videos(){
+	document.getElementById("diff_list").style.visibility ="hidden";
+	document.getElementById("self_video").style.visibility ="visible";
+	document.getElementById("regarder_div").style.visibility ="visible";
+	document.getElementById("localisation_div").style.visibility ="hidden";
+}
+function afficher_liste(){
+	document.getElementById("diff_list").style.visibility ="visible";
+	document.getElementById("self_video").style.visibility ="hidden";
+	document.getElementById("regarder_div").style.visibility ="hidden";
+	document.getElementById("localisation_div").style.visibility ="hidden";
+}
+function afficher_map(){
+	document.getElementById("diff_list").style.visibility ="hidden";
+	document.getElementById("self_video").style.visibility ="hidden";
+	document.getElementById("regarder_div").style.visibility ="hidden";
+	document.getElementById("localisation_div").style.visibility ="visible";
+}
+
+//window.onbeforeunload=deco();
 </script>
-<script>
-//interface graphique
-//Dynamic change DOM
-//findbyID
-</script>
+<!-- Interface graphique -->
+<div id="connect_div" class="container-fluid" style="visibility : visible;">
+	<div class="jumbotron">
+	<label for="name_id">Identifiez-vous!</label>
+	<input type="text" class="form-control" placeholder="Entrez votre nom" name="nom" id="name_id" required/><br/>
+	<input type="button" class="btn btn-primary"  value="Connexion" id="demande_connexion" onclick="connexionPeerServeur()"/>
+	<script>
+	$('#name_id').focus();
+	</script>
+	</div>
+</div>
+<nav class="navbar navbar-default" style="visibility:hidden;">
+<div class="container-fluid">
+	<div class="navbar-header">
+		<div id="header" style="visibility:hidden;">
+		</div>
+		<div id="bouton_filmer" style="visibility:hidden;">
+			<input type="button" class="btn btn-danger" value="Filmer" id="bouton_filmer" onclick="filmer()"/>
+		</div>
+		<div id="disconnect" style="visibility:hidden;">
+			<input type="button" class="btn btn-warning" value="Deconnexion" id="disconnect_button" onclick="deco()"/>
+		</div>
+	</div>	
+	<div id="nav_bouton" >
+		<div class="btn-group-sg">
+			<input type="button" class="btn btn-info" value="Live" id="live_button" onclick="afficher_videos()"/>
+			<input type="button" class="btn btn-info" value="Captors List" id="List_button" onclick="afficher_liste()"/>
+			<input type="button" class="btn btn-info" value="Captors Map" id="List_button" onclick="afficher_map()"/>
+		</div>
+	</div>
+			
+</div>
+</nav>
+
+
+<div id="diff_list" class="container-fluid" style="visibility:hidden;">
+</div>
+<div id="regarder_div" style="visibility:hidden;">
+	<input type="button" value="Regarder" id="bouton_regarder" onclick="filmer()"/>
+	<input type="button" value="Stop" id="bouton_arret" onclick="stop_filmer()"/>
+	<video id="remote_video_player" autoplay>
+	</video>
+</div>
+<div id="self_video" style="visibility:hidden;">
+	<input type="button" value="Stop" id="bouton_arret_film" onclick="stop_filmer()"/>
+	<video id="self_video_player" autoplay>
+	</video>
+</div>
+
+<div id="localisation_div" style="visibility:hidden;">
+	<input type="button" value="Geolocalisation" id="location_button" onclick="getLocation()"/>
+	<input type="button" value="Qui est dans le coin?" id="others_location_button" onclick="askOthersPositions()" style="visibility:hidden;"/>
+	<div id="infos_div"></div>
+	<div id="googleMap" style="width:500px;height:380px;"></div>
+</div>
 
 </body> 
 </html>
