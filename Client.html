@@ -22,7 +22,8 @@ var mon_id;
 var mon_nom;
 var statut_Alice;
 var calling;
-statut_Alice={i_d: "",nom: "",diffuseur: false,spectateur: false,localisation: null, self_video_URL:null};
+var coordonnees={latitude: null, longitude: null};
+statut_Alice={i_d: "",nom: "",diffuseur: false,spectateur: false,localisation: coordonnees, self_video_URL:null};
 var Statut;
 var liste_diffuseurs=[];
 var self_video = document.getElementById("self_video_player");
@@ -30,6 +31,7 @@ var self_video = document.getElementById("self_video_player");
 var remote_video = document.getElementById("remote_video_player");
 var id_dest;
 var liste_boutons=[];
+var coordonnees={latitude: null, longitude: null};
 
 navigator.getUserMedia = ( navigator.getUserMedia ||
                        navigator.webkitGetUserMedia ||
@@ -169,6 +171,43 @@ function stop_filmer(){
 	MAJStatut();
 }
 
+//gestion localisations
+var localisation_div = document.getElementById("infos_div");
+var googleMap= document.getElementById("googleMap");
+function getLocation() {
+	//recuperer sa propre localisation
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(showPosition);
+    } else { 
+        localisation_div.innerHTML = "Geolocation is not supported by this browser.";}
+    }
+    
+function showPosition(position) {
+    var ma_lat=position.coords.latitude;
+    var ma_long=position.coords.longitude;
+    coordonnees={latitude: ma_lat, longitude: ma_long};
+    var myCenter=new google.maps.LatLng(ma_lat,ma_long);
+    var mapProp = {
+		center:myCenter,
+		zoom:15,
+		mapTypeId:google.maps.MapTypeId.ROADMAP
+	};
+	var map=new google.maps.Map(document.getElementById("googleMap"),mapProp);
+  	var marker=new google.maps.Marker({position:myCenter,});
+  	marker.setMap(map);
+  	var infowindow = new google.maps.InfoWindow({content:"Vous etes ici!"});
+  	infowindow.open(map,marker);   
+    statut_Alice.localisation={latitude: ma_lat, longitude: ma_long};
+    console.log(statut_Alice.localisation);
+	//Des qu'on se geolocalise, on MAJ tous les clients
+	//MAIS il faudrait juste envoyer une sousliste des Clients à proximité ou ailleurs
+    MAJStatut();
+	//
+
+}
+///////
+
+
 /////deconnexion
 function deco(){
 	console.log('Deco');
@@ -191,21 +230,24 @@ function afficher_videos(){
 	document.getElementById("self_video").style.visibility ="visible";
 	document.getElementById("regarder_div").style.visibility ="visible";
 	document.getElementById("localisation_div").style.visibility ="hidden";
+	//demander une sousliste (en gros demander à recevoir le msg 'envoieDB')
+	socket.emit('demandelocalisations',statut_Alice);
 }
 function afficher_liste(){
 	document.getElementById("diff_list").style.visibility ="visible";
 	document.getElementById("self_video").style.visibility ="hidden";
 	document.getElementById("regarder_div").style.visibility ="hidden";
 	document.getElementById("localisation_div").style.visibility ="hidden";
+	//demander une sousliste
 }
 function afficher_map(){
 	document.getElementById("diff_list").style.visibility ="hidden";
 	document.getElementById("self_video").style.visibility ="hidden";
 	document.getElementById("regarder_div").style.visibility ="hidden";
 	document.getElementById("localisation_div").style.visibility ="visible";
+	//demander une sousliste
 }
 
-//window.onbeforeunload=deco();
 </script>
 <!-- Interface graphique -->
 <div id="connect_div" class="container-fluid" style="visibility : visible;">
@@ -258,7 +300,6 @@ function afficher_map(){
 
 <div id="localisation_div" style="visibility:hidden;">
 	<input type="button" value="Geolocalisation" id="location_button" onclick="getLocation()"/>
-	<input type="button" value="Qui est dans le coin?" id="others_location_button" onclick="askOthersPositions()" style="visibility:hidden;"/>
 	<div id="infos_div"></div>
 	<div id="googleMap" style="width:500px;height:380px;"></div>
 </div>
