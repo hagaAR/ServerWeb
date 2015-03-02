@@ -9,12 +9,12 @@ var serverWeb = http.createServer(function(req,res){
 	});
 });
 
-var listeClients =[];
-var listAssoPeerWebID=[];
+listeClients =[];
+listAssoPeerWebID=[];
 //il faut repenser a la sousliste des diffuseurs: 
 //mettre en variable locale pour chaque socket de connexion
 //...et envoyer les souslistes des quon demande une recherche des utilisateurs
-var sousliste_diffuseurs=[];
+sousliste_diffuseurs=[];
 // Chargement de socket.io
 var io = require('socket.io').listen(serverWeb);
 // Quand on client se connecte, on le note dans la console
@@ -31,7 +31,8 @@ io.sockets.on('connection', function (socket) {
 		listAssoPeerWebID.push(AssoPeerWebID);
 		//Remplissage de la sous liste des clients diffuseurs
 		//MAIS il faudrait une sous liste personnalisée à la proximité (ou ailleurs) pour chaque client
-		if (statut.diffuseur){
+		//Inutile ici de verifier si le client diffuse car il ne peut diffuser pdt sa connexion au serveur
+		if (statut.diffuseur==true){
 			sousliste_diffuseurs.push(statut);
 		};
 		listeClients.push(statut);
@@ -40,6 +41,7 @@ io.sockets.on('connection', function (socket) {
 		//emission de cette bdd a tous les autres
 		socket.broadcast.emit('envoieDB',sousliste_diffuseurs);
 		//console.log(listeClients[0].nom);
+		JSON.stringify(listeClients);
 	});
 	//gestion de la deconnexion
 	socket.on('disconnect',function(){
@@ -49,11 +51,10 @@ io.sockets.on('connection', function (socket) {
 		var indicemax= listeClients.length;
 		//console.log('client '+ socket.id +' se deconnecte');
 		if (listeClients.length<0){indicemax=0;}
-		console.log('indice max: '+indicemax);
+		//console.log('indice max: '+indicemax);
 		while (k<indicemax){
 			if (listAssoPeerWebID[k].WebID==socket.id){
-				console.log('client '+ socket.id +' se deconnecte');
-				//enlever cet objet du tableau listeClients : http://jonathankowalski.fr/blog/2011/12/supprimer-un-element-dans-un-tableau-javascript/
+				console.log('client de ID '+ socket.id +' se deconnecte');
 				//enlever de la liste des diffuseurs
 				var l=0;
 				while(l<sousliste_diffuseurs.length){
@@ -65,9 +66,7 @@ io.sockets.on('connection', function (socket) {
 				};
 				listeClients.splice(k,1);
 				listAssoPeerWebID.splice(k,1);
-
-				console.log('client'+ socket.id +' est enleve des listes');
-				//enlever cet objet de listAssoPeerWebID 
+				console.log('client de ID'+ socket.id +' est enleve des listes');
 				socket.broadcast.emit('envoieDB',sousliste_diffuseurs); //renvoyer la DB aux clients
 				break;
 			}
@@ -80,37 +79,56 @@ io.sockets.on('connection', function (socket) {
 	//MAJ ds la base de donnees et dans la sous liste
 	socket.on('maj_statut',function(statut){
 		var k=0;
+		var etreDansLaSousListe=false;
 		//dissociation de PeerServer et WebServer??
 		var indicemax= listeClients.length;
-		//console.log('client '+ socket.id +' se deconnecte');
+		console.log('client '+ socket.id +' se MAJ');
 		if (listeClients.length<0){indicemax=0;}
-		//console.log('indice max: '+indicemax);
+		//MAJ de la bdd
 		while (k<indicemax){
 			if (listAssoPeerWebID[k].WebID==socket.id){
-				console.log('client '+ socket.id +' se MAJ');
+				console.log('client (WebID:'+ socket.id +' PeerID:'+statut.i_d+') se MAJ');
 				listeClients[k]=statut;
-				if(listeClients[k].diffuseur){
+				//Controle si le client diffuse ou non
+				console.log('le client '+statut.nom+' diffuse? '+statut.diffuseur);
+				if(statut.diffuseur){
 					var l=0;
+					//var etreDansLaSousListe=false;
 					while(l<sousliste_diffuseurs.length){
-						if(listeClients[k].i_d=sousliste_diffuseurs[l].i_d){
-							sousliste_diffuseurs[l]=listeClients[k];
+						if(statut.i_d==sousliste_diffuseurs[l].i_d){
+							etreDansLaSousListe=true;
+							console.log('le client '+statut.nom+' qui est deja ds la sous liste et diffuse? '+listeClients[k].diffuseur);
+							sousliste_diffuseurs[l]=statut;
 							break;
 						};
 						l++;
 					};
-					//rechercher dans la sousliste_diffuseurs
-					socket.broadcast.emit('envoieDB',sousliste_diffuseurs);
+					if(!etreDansLaSousListe){
+						console.log('le client '+listeClients[k].nom+' nest pas ds la sous liste, est ajoute et diffuse? '+listeClients[k].diffuseur);
+						sousliste_diffuseurs.push(statut);
+						break;
+					};
+				}else{
+					var l=0;
+					//var etreDansLaSousListe=false;
+					while(l<sousliste_diffuseurs.length){
+						if(statut.i_d==sousliste_diffuseurs[l].i_d){
+							sousliste_diffuseurs.splice(l,1);
+						break;
+						};
+						l++;
+					};
 				};
-				 //renvoyer la DB aux clients
 				break;
 			};
 			k++;
 		};
+		//renvoyer la DB aux clients
 		socket.broadcast.emit('envoieDB',sousliste_diffuseurs);
 	});
 
 	//gestion des demandes des localisations
-	socket.on('demandelocalisations',function(coordonnees){
+	socket.on('rafraichirliste',function(coordonnees){
 		socket.emit('envoieDB',sousliste_diffuseurs);
 	});
 });

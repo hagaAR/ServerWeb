@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Live Captured</title> 
 <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
-<script src="http://cdn.peerjs.com/0.3/peer.js"></script>
+<script src="http://cdn.peerjs.com/0.3.9/peer.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script src="http://maps.googleapis.com/maps/api/js"></script>
 <!-- Latest compiled and minified CSS -->
@@ -15,17 +15,20 @@
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js"></script>
 </head>
 
-<body>
+<body ondragover="event.preventDefault()" ondrop="event.preventDefault()">
 <script>
 //fonctions
 var mon_id;
 var mon_nom;
 var statut_Alice;
 var calling;
+var appel;
 var coordonnees={latitude: null, longitude: null};
 statut_Alice={i_d: "",nom: "",diffuseur: false,spectateur: false,localisation: coordonnees, self_video_URL:null};
 var Statut;
-var liste_diffuseurs=[];
+var liste_diffuseurs;
+liste_diffuseurs=[];
+var geolocToutLeMonde;
 var self_video = document.getElementById("self_video_player");
 //var localStream;
 var remote_video = document.getElementById("remote_video_player");
@@ -38,7 +41,8 @@ navigator.getUserMedia = ( navigator.getUserMedia ||
                        navigator.mozGetUserMedia ||
                        navigator.msGetUserMedia);
 
-var socket = io.connect('http://localhost:8080');
+//var socket = io.connect('http://localhost:8080');
+var socket = io.connect('http://172.23.214.96:8080');
 //PeerServer en cloud
 var peer ;
 function connexionPeerServeur(){
@@ -46,43 +50,76 @@ function connexionPeerServeur(){
 	//peer= new Peer({key: 'i006gh58pu95dn29'});
 	//serveur STUN google, pour passer les NAT
 	peer= new Peer({key: 'i006gh58pu95dn29',config: {'iceServers': [{ url: 'stun:stun.l.google.com:19302' } ]}});
+	//peer= new Peer({key: 'i006gh58pu95dn29',config: {'iceServers': [{ url: 'stun:stun.l.google.com:19302' },{ url: 'turn:homeo@turn.bistri.com:80', credential: 'homeo' }]} });
 	peer.on('open',function(){
 		mon_nom= document.getElementById('name_id').value
-		console.log('votre nom est: ' +mon_nom);
-		document.getElementById("header").innerHTML='<label for="disconnect_button">Bonjour ' + mon_nom+'</label>';
+		console.log('votre nom est: ' +mon_nom+' mon PeerID: '+this.id);
+		document.getElementById("header").innerHTML='<h4>Bonjour ' + mon_nom+'</h4>';
 		document.getElementById("header").style.visibility ="visible";
 		document.getElementById("connect_div").style.visibility ="hidden";
+		document.getElementById("connect_div").setAttribute ("class","close");
 		document.getElementById("nav").style.visibility ="visible";
-		document.getElementById("disconnect").style.visibility ="visible";
+		document.getElementById("div_principal").setAttribute ("class","container-fluid");
+		//document.getElementById("bouton_filmer").style.visibility ="visible";
+		//document.getElementById("bouton_arret_film").style.visibility ="hidden";
+		//document.getElementById("disconnect").style.visibility ="visible";
 		mon_id= this.id;
 		statut_Alice={i_d: mon_id,nom: mon_nom,diffuseur: false,spectateur: false,localisation: null,self_video_URL:null};
 		Statut={statut_alice: statut_Alice};
 		ajoutStatut();
-		afficher_liste();
+		afficher_map();
 	});
 
-	//recevoir des appels
- 	peer.on('call', function(call){
-      // Answer the call automatically (instead of prompting user) for demo purposes
-      call.answer(window.localStream);
-      //step3(call);
+	//recevoir des appels ou recevoir une dataConn-mediaConn
+	peer.on('call', function(mediaConn){
+ 	//peer.on('connection', function(mediaConn){
+		// On repond au call
+		mediaConn.answer(window.localStream);
+		// mediaConn.on('open',function(){
+		// 	console.log('envoie holaquetal');
+		// 	mediaConn.send('holaquetal');
+		// 	mediaConn.send(window.localStream);
+		// 	//appel=peer.call(mediaConn.peer,window.localStream);
+		// 	//console.log('appel vers: '+mediaConn.peer);
+		// 	//console.log(appel);
+		// 	//$('#remote_video_player').prop('src', URL.createObjectURL(window.localStream));
+		// });
+
     });
+
+ 	// peer.on('call',function(call){
+ 	// 	call.on('stream',function(remoteStream){
+ 	// 		console.log('on recoit call MGGL ');
+ 	// 		$('#remote_video_player').prop('src', URL.createObjectURL(remoteStream));
+ 	// 	});
+ 	// });
+
+
 };
 
 socket.on('envoieDB', function(liste){
 	indice_dernier_elt = liste.length -1;
+	geolocToutLeMonde=[];
 	if (indice_dernier_elt<0){indice_dernier_elt=0;}
+	//console.log('on recoit une DB: '+liste[1]);
 	///
 	//gerer la liste
 	document.getElementById("diff_list").innerHTML='';
-	document.getElementById("diff_list").innerHTML='liste des diffuseurs<br/>';
-	document.getElementById("diff_list").innerHTML+='<div class="btn-group-vertical">';
+	//document.getElementById("diff_list").innerHTML='<h5>liste des diffuseurs</h2>';
+	//document.getElementById("diff_list").innerHTML+='<div class="btn-group-vertical" >';
+	//document.getElementById("diff_list").innerHTML+='<div class="list-group">';
 	//document.getElementById("diff_list").innerHTML+='<ul class="nav nav-pills nav-stacked">';
 	for (var k=0;k<liste.length;k++){
 		liste_diffuseurs=[];
+		//alert('MAJ du #'+k+' ');
+		//console.log('liste diff: '+liste[k].nom);
 		liste_diffuseurs[k]=liste[k];
+		if (liste_diffuseurs[k].localisation !== null){
+			geolocToutLeMonde.push([liste_diffuseurs[k].nom,liste_diffuseurs[k].localisation.latitude,liste_diffuseurs[k].localisation.longitude]);
+		};
+		
 		var id_destination= String(liste_diffuseurs[k].i_d);
-		console.log('ceci est l id destination: ' +id_destination);
+		console.log('ceci est user: '+liste_diffuseurs[k].nom+' l id destination: ' +id_destination);
 		
 		var button = document.createElement("button") ;
 		//button.innerHTML+='<li>';
@@ -99,7 +136,7 @@ socket.on('envoieDB', function(liste){
         
 	}
 	//document.getElementById("diff_list").innerHTML+='</ul>';
-	document.getElementById("diff_list").innerHTML+='</div>';
+	//document.getElementById("diff_list").innerHTML+='</div>';
 	////
 	//console.log('on recoit une liste');
 
@@ -116,21 +153,44 @@ function MAJStatut(){
 }
 
 function CallPeer(id_dest){
-	//console.log('CallPeer id: '+id_dest);
-	//self_video = document.getElementById("self_video_player");
-	//console.log(self_video);
-	//Pb avec localStream
+	//Pb avec window.localStream, s'il est null...et c'est ce qu'on voudrait
+	//on est oblige d'avoir un appel ie des flux symetriques(alice<-->bob)
+	//...mais on voudrait alice-->bob uniquement
+	//https://github.com/muaz-khan/WebRTC-Experiment/tree/master/Pre-recorded-Media-Streaming
+	//Idee: plutot qu'un call, utiliser une dataConnection
+	filmer();
 	var calling= peer.call(id_dest,window.localStream);
+	//calling= peer.connect(id_dest);
+	
 	calling.on('stream', function(stream){
-		//remote_video.src=URL.createObjectURL(stream);
-        $('#remote_video_player').prop('src', URL.createObjectURL(stream));
-    });
+	 	console.log('Demarrage Connect-Call callback stream');
+	    $('#remote_video_player').prop('src', URL.createObjectURL(stream));
+	});
+
+	calling.on('open',function(){
+		console.log('ouverture connect');
+ 		// this.on('stream',function(remoteStream){
+ 		// 	console.log('Ca stream MGGL');
+ 		// 	$('#remote_video_player').prop('src', URL.createObjectURL(remoteStream));
+ 		// });
+ 	});
+ 	// calling.on('data',function(dataStream){
+		// //console.log('recoit data: '+ dataStream);
+		// $('#remote_video_player').prop('src', URL.createObjectURL(dataStream));
+		// //console.log('ouverture dataConn');
+ 	// 	// calling.on('stream',function(remoteStream){
+ 	// 	// 	console.log('Ca stream MGGL');
+ 	// 	// 	$('#remote_video_player').prop('src', URL.createObjectURL(remoteStream));
+ 	// 	// });
+ 	// });
+
 
     //revenir a la page live
-    afficher_videos();
+    afficher_regarder();
 }
 
 function filmer(){
+	console.log('filmer');
 	if (navigator.getUserMedia) {
 	   navigator.getUserMedia (
 	      // constraints
@@ -141,17 +201,22 @@ function filmer(){
 	      // successCallback
 	      function(localMediaStream) {
 	      	 window.localStream=localMediaStream;
+	      	 console.log('nature de localMediaStream: '+localMediaStream);
+	      	 //console.log(localMediaStream);
 	      	 self_video = document.getElementById("self_video_player");
 	         self_video.src = window.URL.createObjectURL(localMediaStream);
 	         statut_Alice.self_video_URL=self_video.src;
 	         console.log('self_video.src : '+self_video.src);
 	         // Do something with the video here, e.g. video.play()
 	         self_video.play();
-	         document.getElementById("bouton_filmer").disabled =true;
-	         document.getElementById("bouton_arret_film").disabled =false;
+	         //document.getElementById("bouton_filmer").disabled ="disabled";
+	         //document.getElementById("bouton_filmer").setAttribute ("style","visibility:hidden;");
+	         //document.getElementById("bouton_arret_film").setAttribute ("style","visibility:visible;");
+	         //document.getElementById("bouton_arret_film").disabled =false;
 	         statut_Alice.diffuseur=true;
 	         Statut={statut_alice: statut_Alice};
 	         MAJStatut();
+	         afficher_filmer();
 	      },
 	      // errorCallback
 	      function(err) {
@@ -159,15 +224,16 @@ function filmer(){
 	      }
 	   );
 	} else {console.log("getUserMedia not supported");}
+
 }
 function stop_filmer(){
 	//impossible de desactiver getusermedia -ie la webcam- par l'api (donc sans appuyer MANUELLEMENT)
 	//risque(?) de probleme d'utilisation en fond sur un smartphone sans que le user puisse le voir
-	document.getElementById("bouton_filmer").disabled =false;
-	document.getElementById("bouton_arret_film").disabled =true;
+	window.localStream.close();
 	statut_Alice.diffuseur=false;
 	statut_Alice.self_video_URL=null;
 	Statut={statut_alice: statut_Alice};
+	//window.localStream.stop();
 	MAJStatut();
 }
 
@@ -186,6 +252,22 @@ function showPosition(position) {
     var ma_lat=position.coords.latitude;
     var ma_long=position.coords.longitude;
     coordonnees={latitude: ma_lat, longitude: ma_long};
+    var MarkerAutre;
+    for(var n=0;n<liste_diffuseurs.length;n++){
+    	MarkerAutre= new google.maps.Marker({
+        	position: new google.maps.LatLng(liste_diffuseurs[n].localisation.latitude, liste_diffuseurs[n].localisation.longitude),
+        	map: googleMap
+      	});
+      	google.maps.event.addListener(MarkerAutre,'click',(function(MarkerAutre,n){
+      		return function(){
+      			infowindow.setContent(liste_diffuseurs[n].nom);
+      			infowindow.open(googleMap,MarkerAutre);
+      		}
+      	})
+      	(MarkerAutre,n));
+    };
+
+
     var myCenter=new google.maps.LatLng(ma_lat,ma_long);
     var mapProp = {
 		center:myCenter,
@@ -193,12 +275,14 @@ function showPosition(position) {
 		mapTypeId:google.maps.MapTypeId.ROADMAP
 	};
 	var map=new google.maps.Map(document.getElementById("googleMap"),mapProp);
-  	var marker=new google.maps.Marker({position:myCenter,});
-  	marker.setMap(map);
-  	var infowindow = new google.maps.InfoWindow({content:"Vous etes ici!"});
-  	infowindow.open(map,marker);   
+  	var markerGoogle=new google.maps.Marker({position:myCenter,});
+  	markerGoogle.setMap(map);
+  	var infowindow = new google.maps.InfoWindow();
+  	infowindow.open(map,markerGoogle);   
     statut_Alice.localisation={latitude: ma_lat, longitude: ma_long};
-    console.log(statut_Alice.localisation);
+    console.log('localisation: '+statut_Alice.localisation);
+
+    //http://pingouindesalpes.com/?article144/plusieurs-marqueurs-avec-google-maps
 	//Des qu'on se geolocalise, on MAJ tous les clients
 	//MAIS il faudrait juste envoyer une sousliste des Clients à proximité ou ailleurs
     MAJStatut();
@@ -206,7 +290,14 @@ function showPosition(position) {
 
 }
 ///////
+function rafraichir_liste(){
+	//demander une sousliste
+	socket.emit('rafraichirliste',statut_Alice);
+}
 
+function rechercher_captors_loc(){
+	socket.emit('rechercher',geolocalisation);
+}
 
 /////deconnexion
 function deco(){
@@ -225,84 +316,111 @@ function deco(){
 	return;
 }
 
-function afficher_videos(){
-	document.getElementById("diff_list").style.visibility ="hidden";
-	document.getElementById("self_video").style.visibility ="visible";
-	document.getElementById("regarder_div").style.visibility ="visible";
-	document.getElementById("localisation_div").style.visibility ="hidden";
-	//demander une sousliste (en gros demander à recevoir le msg 'envoieDB')
-	socket.emit('demandelocalisations',statut_Alice);
+function afficher_filmer(){
+	console.log('afficher_filmer');
+	document.getElementById("regarder_div").setAttribute ("class","hidden");
+	document.getElementById("self_video").setAttribute ("class","col-xs-4");
+	document.getElementById("localisation_div").setAttribute ("class","hidden");
+	document.getElementById("barre_recherche").setAttribute ("class","hidden");
 }
-function afficher_liste(){
-	document.getElementById("diff_list").style.visibility ="visible";
-	document.getElementById("self_video").style.visibility ="hidden";
-	document.getElementById("regarder_div").style.visibility ="hidden";
-	document.getElementById("localisation_div").style.visibility ="hidden";
-	//demander une sousliste
+function afficher_regarder(){
+	document.getElementById("regarder_div").setAttribute ("class","col-xs-4");
+	document.getElementById("self_video").setAttribute ("class","hidden");
+	document.getElementById("localisation_div").setAttribute ("class","hidden");
+	document.getElementById("barre_recherche").setAttribute ("class","hidden");
 }
+
 function afficher_map(){
-	document.getElementById("diff_list").style.visibility ="hidden";
-	document.getElementById("self_video").style.visibility ="hidden";
-	document.getElementById("regarder_div").style.visibility ="hidden";
-	document.getElementById("localisation_div").style.visibility ="visible";
-	//demander une sousliste
+	getLocation();
+	document.getElementById("regarder_div").setAttribute ("class","hidden");
+	document.getElementById("barre_recherche").setAttribute ("class","input-group");
+	document.getElementById("self_video").setAttribute ("class","hidden");
+	document.getElementById("localisation_div").setAttribute ("class","col-xs-4");
 }
 
 </script>
 <!-- Interface graphique -->
-<div id="connect_div" class="container-fluid" style="visibility : visible;">
-	<div class="jumbotron">
+
+<div id="nav" class="navbar navbar-default" style="visibility:hidden;">
+<div class="container-fluid">
+	<div class="row">
+		<div class="navbar-header" id="header" style="visibility:hidden;">
+		</div>	
+	</div>	
+	<div id="nav_bouton" class="row" >
+		<div class="btn-group" role="group">
+			<button type="button" class="btn btn-danger col-1" aria-label="Left Align" value="Filmer" id="bouton_filmer" onclick="filmer()"><span class="glyphicon glyphicon-facetime-video" aria-hidden="true">Filmer</span>
+			</button>
+			<button type="button" class="btn btn-danger col-1" aria-label="Left Align" value="Stop" id="bouton_arret_film" onclick="stop_filmer()">
+				<span class="glyphicon glyphicon-stop" aria-hidden="true"></span>
+			</button>
+
+			<div class="btn-group">
+				<button class="btn btn-info dropdown-toggle col-4" aria-label="Left Align" type="button" id="dropdownCaptures" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span>Captures
+				</button>
+				<ul class="dropdown-menu" role="menu" aria-labelledby="dropdownCaptures">
+					<li role="presentation"><input type="button" class="btn btn-info" value="My Capture" id="capture_button" onclick="afficher_filmer()"/></li>
+					<li role="presentation"><input type="button" class="btn btn-info" value="Others'" id="live_button" onclick="afficher_regarder()"/></li>
+				</ul>
+			</div>
+			<button type="button" class="btn btn-info col-4" aria-label="Left Align" value="Captors Map" id="List_button" onclick="afficher_map()">
+				<span class="glyphicon glyphicon-globe" aria-hidden="true">Map</span>
+			</button>
+			<!-- ...Creer une liste difilante ac ...glyphicon glyphicon-option-horizontal -->
+			<button type="button" class="btn btn-warning col-1" aria-label="Left Align" value="R" id="refresh_button" onclick="rafraichir_liste()">
+				<span class="glyphicon glyphicon-refresh" aria-hidden="true"></span>
+			</button>
+			<input type="button" class="btn btn-warning col-1" value="D" id="disconnect_button" onclick="deco()"/>
+			
+		</div>
+	</div>
+			
+</div>
+</div>
+
+<div id="connect_div" class="jumbotron" style="visibility : visible;">
 	<label for="name_id">Identifiez-vous!</label>
 	<input type="text" class="form-control" placeholder="Entrez votre nom" name="nom" id="name_id" required/><br/>
 	<input type="button" class="btn btn-primary"  value="Connexion" id="demande_connexion" onclick="connexionPeerServeur()"/>
 	<script>
 	$('#name_id').focus();
 	</script>
+</div>
+
+<div id="div_principal" class="hidden"> 
+	<!-- <div id="diff_list" class="btn-group-vertical" style="visibility:hidden;"> -->
+	<div id="fenetre" class="container-fluid">
+		<div class="row">
+			<div id="diff_list" class="btn-group-vertical col-xs-2" >
+			</div>
+			<div id="regarder_div" class="col-xs-4">
+				<video id="remote_video_player" autoplay>
+				</video>
+			</div>
+			<div id="self_video" class="col-xs-4" >
+				<video id="self_video_player" autoplay>
+				</video>
+			</div>
+			<div id="localisation_div" class="col-xs-4">
+				<div class="container-fluid">
+					<div id="barre_recherche" class="input-group">
+						<input class="form-control col-xs-4" type="text" aria-describedby="basic-addon2" placeholder="Where?"/>
+						<span class="input-group-addon" id="basic-addon2">
+							<button type="button" class="btn btn-infos " aria-label="Left Align" value="" id="recherche_loc_button" onclick="rechercher_captors_loc()">
+							<span class="glyphicon glyphicon-search" aria-hidden="true"></span>
+						</button>
+						</span>
+					</div>
+					<div class="row">
+						<div id="infos_div"></div>
+					</div>
+					<div class="row">
+						<div id="googleMap" style="width:500px;height:380px;"></div>
+					</div>
+				</div>
+			</div>
+		</div>
 	</div>
 </div>
-<nav class="navbar navbar-default" style="visibility:hidden;">
-<div class="container-fluid">
-	<div class="navbar-header">
-		<div id="header" style="visibility:hidden;">
-		</div>
-		<div id="bouton_filmer" style="visibility:hidden;">
-			<input type="button" class="btn btn-danger" value="Filmer" id="bouton_filmer" onclick="filmer()"/>
-		</div>
-		<div id="disconnect" style="visibility:hidden;">
-			<input type="button" class="btn btn-warning" value="Deconnexion" id="disconnect_button" onclick="deco()"/>
-		</div>
-	</div>	
-	<div id="nav_bouton" >
-		<div class="btn-group-sg">
-			<input type="button" class="btn btn-info" value="Live" id="live_button" onclick="afficher_videos()"/>
-			<input type="button" class="btn btn-info" value="Captors List" id="List_button" onclick="afficher_liste()"/>
-			<input type="button" class="btn btn-info" value="Captors Map" id="List_button" onclick="afficher_map()"/>
-		</div>
-	</div>
-			
-</div>
-</nav>
-
-
-<div id="diff_list" class="container-fluid" style="visibility:hidden;">
-</div>
-<div id="regarder_div" style="visibility:hidden;">
-	<input type="button" value="Regarder" id="bouton_regarder" onclick="filmer()"/>
-	<input type="button" value="Stop" id="bouton_arret" onclick="stop_filmer()"/>
-	<video id="remote_video_player" autoplay>
-	</video>
-</div>
-<div id="self_video" style="visibility:hidden;">
-	<input type="button" value="Stop" id="bouton_arret_film" onclick="stop_filmer()"/>
-	<video id="self_video_player" autoplay>
-	</video>
-</div>
-
-<div id="localisation_div" style="visibility:hidden;">
-	<input type="button" value="Geolocalisation" id="location_button" onclick="getLocation()"/>
-	<div id="infos_div"></div>
-	<div id="googleMap" style="width:500px;height:380px;"></div>
-</div>
-
 </body> 
 </html>
