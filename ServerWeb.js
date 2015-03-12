@@ -8,6 +8,7 @@ var serverWeb = http.createServer(function(req,res){
 		res.end(content); 
 	});
 });
+serverWeb.listen(8080);
 
 listeClients =[];
 listAssoPeerWebID=[];
@@ -133,4 +134,3 @@ io.sockets.on('connection', function (socket) {
 	});
 });
 
-serverWeb.listen(8080);

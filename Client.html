@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Live Captured</title> 
+<title>Capture</title> 
 <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
 <script src="http://cdn.peerjs.com/0.3.9/peer.js"></script>
 <script src="/socket.io/socket.io.js"></script>
@@ -23,8 +23,9 @@ var mon_nom;
 var statut_Alice;
 var calling;
 var appel;
+var nb_diff_connectes=0;
 var coordonnees={latitude: null, longitude: null};
-statut_Alice={i_d: "",nom: "",diffuseur: false,spectateur: false,localisation: coordonnees, self_video_URL:null};
+statut_Alice={i_d: "",nom: "",diffuseur: false,spectateur: false,localisation: coordonnees, self_video_URL:null,nb_diff_connectes: nb_diff_connectes};
 var Statut;
 var liste_diffuseurs;
 liste_diffuseurs=[];
@@ -33,6 +34,7 @@ var self_video = document.getElementById("self_video_player");
 //var localStream;
 var remote_video = document.getElementById("remote_video_player");
 var id_dest;
+var welcome_txt;
 var liste_boutons=[];
 var coordonnees={latitude: null, longitude: null};
 
@@ -42,7 +44,9 @@ navigator.getUserMedia = ( navigator.getUserMedia ||
                        navigator.msGetUserMedia);
 
 //var socket = io.connect('http://localhost:8080');
-var socket = io.connect('http://172.23.214.96:8080');
+var socket = io.connect(window.location.href);
+//var socket = io.connect('http://172.23.214.96:8080');
+
 //PeerServer en cloud
 var peer ;
 function connexionPeerServeur(){
@@ -54,11 +58,16 @@ function connexionPeerServeur(){
 	peer.on('open',function(){
 		mon_nom= document.getElementById('name_id').value
 		console.log('votre nom est: ' +mon_nom+' mon PeerID: '+this.id);
-		document.getElementById("header").innerHTML='<h4>Bonjour ' + mon_nom+'</h4>';
-		document.getElementById("header").style.visibility ="visible";
-		document.getElementById("connect_div").style.visibility ="hidden";
-		document.getElementById("connect_div").setAttribute ("class","close");
-		document.getElementById("nav").style.visibility ="visible";
+		document.getElementById("welcome_txt").innerHTML='<h4>Hello ' + mon_nom+'</h4>';
+		welcome_txt=document.getElementById("welcome_txt").innerHTML;
+
+
+
+		//document.getElementById("header").style.visibility ="visible";
+		//document.getElementById("connect_div").style.visibility ="hidden";
+		document.getElementById("connect_div").setAttribute ("class","hidden");
+		document.getElementById("nav").setAttribute ("class","navbar navbar-default");
+		//document.getElementById("nav").style.visibility ="visible";
 		document.getElementById("div_principal").setAttribute ("class","container-fluid");
 		//document.getElementById("bouton_filmer").style.visibility ="visible";
 		//document.getElementById("bouton_arret_film").style.visibility ="hidden";
@@ -71,10 +80,10 @@ function connexionPeerServeur(){
 	});
 
 	//recevoir des appels ou recevoir une dataConn-mediaConn
-	peer.on('call', function(mediaConn){
+	// peer.on('call', function(mediaConn){
  	//peer.on('connection', function(mediaConn){
 		// On repond au call
-		mediaConn.answer(window.localStream);
+		// mediaConn.answer(window.localStream);
 		// mediaConn.on('open',function(){
 		// 	console.log('envoie holaquetal');
 		// 	mediaConn.send('holaquetal');
@@ -85,14 +94,23 @@ function connexionPeerServeur(){
 		// 	//$('#remote_video_player').prop('src', URL.createObjectURL(window.localStream));
 		// });
 
-    });
+    // });
 
- 	// peer.on('call',function(call){
- 	// 	call.on('stream',function(remoteStream){
- 	// 		console.log('on recoit call MGGL ');
- 	// 		$('#remote_video_player').prop('src', URL.createObjectURL(remoteStream));
- 	// 	});
- 	// });
+ 	peer.on('call',function(call){
+ 		call.answer(window.localStream);
+ 		call.on('stream',function(remoteStream){
+			console.log('on recoit call MGGL ');
+			// $('#remote_video_player').prop('src', URL.createObjectURL(remoteStream));
+			nb_diff_connectes+=1;
+			document.getElementById("welcome_txt").innerHTML=welcome_txt+' - '+nb_diff_connectes+' spectateurs connectés';
+ 		});
+ 		call.on('close',function(){
+			console.log('on arrete une P2Pcomm ');
+			nb_diff_connectes+=-1;
+			document.getElementById("welcome_txt").innerHTML=welcome_txt+' - '+nb_diff_connectes+' spectateurs connectés';
+ 		});
+
+ 	});
 
 
 };
@@ -128,7 +146,7 @@ socket.on('envoieDB', function(liste){
         button.setAttribute ("class","btn btn-primary");
         button.value = liste_diffuseurs[k].nom ;
         button.name = liste_diffuseurs[k].nom ;
-        button.setAttribute("onClick","return CallPeer('"+id_destination+"')") ;
+        button.setAttribute("onClick","return ConnexionPeer2Peer('"+id_destination+"')") ;
         //button.innerHTML+='</li>';
         document.getElementById("diff_list").appendChild(button);
         
@@ -152,14 +170,14 @@ function MAJStatut(){
 	console.log('envoie MAJ Statut');
 }
 
-function CallPeer(id_dest){
+function ConnexionPeer2Peer(id_dest){
 	//Pb avec window.localStream, s'il est null...et c'est ce qu'on voudrait
 	//on est oblige d'avoir un appel ie des flux symetriques(alice<-->bob)
 	//...mais on voudrait alice-->bob uniquement
 	//https://github.com/muaz-khan/WebRTC-Experiment/tree/master/Pre-recorded-Media-Streaming
 	//Idee: plutot qu'un call, utiliser une dataConnection
 	filmer();
-	var calling= peer.call(id_dest,window.localStream);
+		calling= peer.call(id_dest,window.localStream);
 	//calling= peer.connect(id_dest);
 	
 	calling.on('stream', function(stream){
@@ -167,21 +185,21 @@ function CallPeer(id_dest){
 	    $('#remote_video_player').prop('src', URL.createObjectURL(stream));
 	});
 
-	calling.on('open',function(){
-		console.log('ouverture connect');
- 		// this.on('stream',function(remoteStream){
- 		// 	console.log('Ca stream MGGL');
- 		// 	$('#remote_video_player').prop('src', URL.createObjectURL(remoteStream));
- 		// });
- 	});
- 	// calling.on('data',function(dataStream){
+	// calling.on('open',function(){
+	// 	console.log('ouverture connect');
+ // 		// this.on('stream',function(remoteStream){
+ // 		// 	console.log('Ca stream MGGL');
+ // 		// 	$('#remote_video_player').prop('src', URL.createObjectURL(remoteStream));
+ // 		// });
+ // 	});
+ // 	// calling.on('data',function(dataStream){
 		// //console.log('recoit data: '+ dataStream);
 		// $('#remote_video_player').prop('src', URL.createObjectURL(dataStream));
 		// //console.log('ouverture dataConn');
- 	// 	// calling.on('stream',function(remoteStream){
- 	// 	// 	console.log('Ca stream MGGL');
- 	// 	// 	$('#remote_video_player').prop('src', URL.createObjectURL(remoteStream));
- 	// 	// });
+ 		// calling.on('stream',function(remoteStream){
+ 		// 	console.log('Ca stream MGGL');
+ 		// 	$('#remote_video_player').prop('src', URL.createObjectURL(remoteStream));
+ 		// });
  	// });
 
 
@@ -196,12 +214,13 @@ function filmer(){
 	      // constraints
 	      {
 	         video: true,
-	         audio: true
+	         audio: false
 	      },
 	      // successCallback
 	      function(localMediaStream) {
 	      	 window.localStream=localMediaStream;
 	      	 console.log('nature de localMediaStream: '+localMediaStream);
+	      	 //afficher_filmer();
 	      	 //console.log(localMediaStream);
 	      	 self_video = document.getElementById("self_video_player");
 	         self_video.src = window.URL.createObjectURL(localMediaStream);
@@ -212,12 +231,13 @@ function filmer(){
 	         //document.getElementById("bouton_filmer").disabled ="disabled";
 	         //document.getElementById("bouton_filmer").setAttribute ("style","visibility:hidden;");
 	         //document.getElementById("bouton_arret_film").setAttribute ("style","visibility:visible;");
-	         //document.getElementById("bouton_arret_film").disabled =false;
+	         document.getElementById("bouton_arret_film").disabled =false;
 	         statut_Alice.diffuseur=true;
 	         Statut={statut_alice: statut_Alice};
 	         MAJStatut();
-	         afficher_filmer();
-	      },
+	         
+	      }
+	      ,
 	      // errorCallback
 	      function(err) {
 	         console.log("The following error occured: " + err);
@@ -277,14 +297,15 @@ function showPosition(position) {
 	var map=new google.maps.Map(document.getElementById("googleMap"),mapProp);
   	var markerGoogle=new google.maps.Marker({position:myCenter,});
   	markerGoogle.setMap(map);
-  	var infowindow = new google.maps.InfoWindow();
+  	var infowindow = new google.maps.InfoWindow(statut_Alice.nom);
   	infowindow.open(map,markerGoogle);   
-    statut_Alice.localisation={latitude: ma_lat, longitude: ma_long};
-    console.log('localisation: '+statut_Alice.localisation);
+    
 
     //http://pingouindesalpes.com/?article144/plusieurs-marqueurs-avec-google-maps
 	//Des qu'on se geolocalise, on MAJ tous les clients
 	//MAIS il faudrait juste envoyer une sousliste des Clients à proximité ou ailleurs
+	statut_Alice.localisation={latitude: ma_lat, longitude: ma_long};
+    console.log('localisation: '+statut_Alice.localisation);
     MAJStatut();
 	//
 
@@ -321,19 +342,19 @@ function afficher_filmer(){
 	document.getElementById("regarder_div").setAttribute ("class","hidden");
 	document.getElementById("self_video").setAttribute ("class","col-xs-4");
 	document.getElementById("localisation_div").setAttribute ("class","hidden");
-	document.getElementById("barre_recherche").setAttribute ("class","hidden");
+	//document.getElementById("barre_recherche").setAttribute ("class","hidden");
 }
 function afficher_regarder(){
 	document.getElementById("regarder_div").setAttribute ("class","col-xs-4");
 	document.getElementById("self_video").setAttribute ("class","hidden");
 	document.getElementById("localisation_div").setAttribute ("class","hidden");
-	document.getElementById("barre_recherche").setAttribute ("class","hidden");
+	//document.getElementById("barre_recherche").setAttribute ("class","hidden");
 }
 
 function afficher_map(){
 	getLocation();
 	document.getElementById("regarder_div").setAttribute ("class","hidden");
-	document.getElementById("barre_recherche").setAttribute ("class","input-group");
+	//document.getElementById("barre_recherche").setAttribute ("class","input-group");
 	document.getElementById("self_video").setAttribute ("class","hidden");
 	document.getElementById("localisation_div").setAttribute ("class","col-xs-4");
 }
@@ -341,36 +362,52 @@ function afficher_map(){
 </script>
 <!-- Interface graphique -->
 
-<div id="nav" class="navbar navbar-default" style="visibility:hidden;">
+<div id="nav" class="hidden">
 <div class="container-fluid">
 	<div class="row">
-		<div class="navbar-header" id="header" style="visibility:hidden;">
+		<div class="navbar-header" id="header" >
+				<div id="welcome_txt">
+				</div>
+				<!-- On va plutot Swiper (caroussel) ici! -->
+				<div class="btn-group">
+					<button class="btn btn-default dropdown-toggle " aria-label="Left Align" type="button" id="dropdownCaptures" data-toggle="dropdown" aria-expanded="true"><span class="caret" aria-hidden="true"></span>Select Screen
+					</button>
+					<ul class="dropdown-menu" role="menu" aria-labelledby="dropdownCaptures">
+						<li role="presentation"><input type="button" class="btn btn-info" value="Mine's" id="capture_button" onclick="afficher_filmer()"/></li>
+						<li role="presentation"><input type="button" class="btn btn-info" value="Others'" id="live_button" onclick="afficher_regarder()"/></li>
+					</ul>
+				</div>
+				<!-- On va Swiper (caroussel) en haut! -->
 		</div>	
-	</div>	
+		
+	</div>
+	
 	<div id="nav_bouton" class="row" >
 		<div class="btn-group" role="group">
-			<button type="button" class="btn btn-danger col-1" aria-label="Left Align" value="Filmer" id="bouton_filmer" onclick="filmer()"><span class="glyphicon glyphicon-facetime-video" aria-hidden="true">Filmer</span>
+			<button type="button" class="btn btn-danger " aria-label="Left Align" value="Filmer" id="bouton_filmer" onclick="filmer()"><span class="glyphicon glyphicon-facetime-video" aria-hidden="true"></span>
 			</button>
-			<button type="button" class="btn btn-danger col-1" aria-label="Left Align" value="Stop" id="bouton_arret_film" onclick="stop_filmer()">
+			<button type="button" class="btn btn-danger " aria-label="Left Align" value="Stop" id="bouton_arret_film" onclick="stop_filmer()" disabled="disabled">
 				<span class="glyphicon glyphicon-stop" aria-hidden="true"></span>
 			</button>
 
 			<div class="btn-group">
-				<button class="btn btn-info dropdown-toggle col-4" aria-label="Left Align" type="button" id="dropdownCaptures" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span>Captures
+				<button class="btn btn-info dropdown-toggle " aria-label="Left Align" type="button" id="dropdownStreamers" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span>Streamers
 				</button>
-				<ul class="dropdown-menu" role="menu" aria-labelledby="dropdownCaptures">
-					<li role="presentation"><input type="button" class="btn btn-info" value="My Capture" id="capture_button" onclick="afficher_filmer()"/></li>
-					<li role="presentation"><input type="button" class="btn btn-info" value="Others'" id="live_button" onclick="afficher_regarder()"/></li>
+				<ul class="dropdown-menu" role="menu" aria-labelledby="dropdownStreamers">
+					<div id="diff_list" class="dropdown-menu btn-group-vertical" >
+					</div>
 				</ul>
 			</div>
-			<button type="button" class="btn btn-info col-4" aria-label="Left Align" value="Captors Map" id="List_button" onclick="afficher_map()">
-				<span class="glyphicon glyphicon-globe" aria-hidden="true">Map</span>
+				
+
+			<button type="button" class="btn btn-info " aria-label="Left Align" value="Captors Map" id="List_button" onclick="afficher_map()">
+				<span class="glyphicon glyphicon-globe" aria-hidden="true"></span>
 			</button>
 			<!-- ...Creer une liste difilante ac ...glyphicon glyphicon-option-horizontal -->
-			<button type="button" class="btn btn-warning col-1" aria-label="Left Align" value="R" id="refresh_button" onclick="rafraichir_liste()">
+			<button type="button" class="btn btn-warning " aria-label="Left Align" value="R" id="refresh_button" onclick="rafraichir_liste()">
 				<span class="glyphicon glyphicon-refresh" aria-hidden="true"></span>
 			</button>
-			<input type="button" class="btn btn-warning col-1" value="D" id="disconnect_button" onclick="deco()"/>
+			<input type="button" class="btn btn-warning " value="D" id="disconnect_button" onclick="deco()"/>
 			
 		</div>
 	</div>
@@ -378,44 +415,53 @@ function afficher_map(){
 </div>
 </div>
 
-<div id="connect_div" class="jumbotron" style="visibility : visible;">
-	<label for="name_id">Identifiez-vous!</label>
-	<input type="text" class="form-control" placeholder="Entrez votre nom" name="nom" id="name_id" required/><br/>
-	<input type="button" class="btn btn-primary"  value="Connexion" id="demande_connexion" onclick="connexionPeerServeur()"/>
-	<script>
-	$('#name_id').focus();
-	</script>
+<div id="connect_div" class="panel panel-default">
+	<div class="panel-heading">
+		<h3 class="panel-title">Welcome to Capture. Who are you?</h3>
+	</div>
+	<div class="panel-body">
+		<input type="text" class="form-control" placeholder="Input your nickname" name="nom" id="name_id" required/><br/>
+		<input type="button" class="btn btn-primary"  value="Let's go" id="demande_connexion" onclick="connexionPeerServeur()"/>
+		<script>
+		$('#name_id').focus();
+		</script>
+	</div>
 </div>
 
 <div id="div_principal" class="hidden"> 
 	<!-- <div id="diff_list" class="btn-group-vertical" style="visibility:hidden;"> -->
 	<div id="fenetre" class="container-fluid">
 		<div class="row">
-			<div id="diff_list" class="btn-group-vertical col-xs-2" >
-			</div>
+			<!-- <div id="diff_list" class="btn-group-vertical col-xs-2" >
+			</div> -->
 			<div id="regarder_div" class="col-xs-4">
 				<video id="remote_video_player" autoplay>
 				</video>
 			</div>
 			<div id="self_video" class="col-xs-4" >
-				<video id="self_video_player" autoplay>
+				<div id="titre_self_video">
+					Your capture
+				</div>
+				<video id="self_video_player" title="Your capture" autoplay>
 				</video>
 			</div>
-			<div id="localisation_div" class="col-xs-4">
+			<div id="localisation_div" class="">
 				<div class="container-fluid">
-					<div id="barre_recherche" class="input-group">
-						<input class="form-control col-xs-4" type="text" aria-describedby="basic-addon2" placeholder="Where?"/>
-						<span class="input-group-addon" id="basic-addon2">
-							<button type="button" class="btn btn-infos " aria-label="Left Align" value="" id="recherche_loc_button" onclick="rechercher_captors_loc()">
-							<span class="glyphicon glyphicon-search" aria-hidden="true"></span>
-						</button>
-						</span>
+					<div class="row">
+						<div id="barre_recherche" class="navbar-form" role="search">
+							<div class="form-group" role="form">
+								<input class="form-control" type="text" placeholder="Where?"/>
+							</div>
+								<button type="button" value="" class="btn btn-info navbar-btn" id="recherche_loc_button" onclick="rechercher_captors_loc()">
+								<span class="glyphicon glyphicon-search" aria-hidden="true"></span>
+								</button>
+						</div>
 					</div>
 					<div class="row">
 						<div id="infos_div"></div>
 					</div>
 					<div class="row">
-						<div id="googleMap" style="width:500px;height:380px;"></div>
+						<div id="googleMap" class="container" style="width:500px;height:380px;"></div>
 					</div>
 				</div>
 			</div>
